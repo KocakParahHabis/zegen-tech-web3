@@ -100,14 +100,14 @@ export default function Home() {
     }
   };
 
-  // --- FITUR: DAILY CHECK-IN (SESUAI REQUEST KAMU) ---
+  // --- FITUR: DAILY CHECK-IN ---
   const handleDailyCheckIn = () => {
     if (!connected) return alert("Connect wallet dulu, Gi!");
     const today = new Date().toLocaleDateString();
     if (lastCheckIn === today) return;
 
     const newStreak = streak + 1;
-    const newPoints = refPoints + 5; // Tambah poin saat check-in
+    const newPoints = refPoints + 5; 
     
     setStreak(newStreak);
     setRefPoints(newPoints);
@@ -156,6 +156,7 @@ export default function Home() {
     }
   }, [publicKey, connected, connection]);
 
+  // --- LOGIKA AUTO-RESET & AUTO-RECONNECT ---
   useEffect(() => {
     if (connected && publicKey) {
       getWalletData();
@@ -222,7 +223,7 @@ export default function Home() {
         {/* KOLOM KIRI */}
         <div className="lg:col-span-4 space-y-6">
           
-          {/* BALANCE SECTION */}
+          {/* BALANCE SECTION - UPDATED LOGIC */}
           <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
             <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
@@ -232,12 +233,12 @@ export default function Home() {
               </button>
             </div>
             <h2 className="text-5xl font-mono font-bold tracking-tighter relative z-10">
-              {connected ? balance?.toFixed(3) : "0.000"} 
+              {/* Saldo akan muncul otomatis jika wallet connect dan data tersedia */}
+              {connected && balance !== null ? balance.toFixed(3) : "0.000"} 
               <span className="text-lg text-indigo-400 italic ml-2">SOL</span>
             </h2>
           </section>
 
-          {/* REFERRAL STATS */}
           <section className="p-8 bg-gradient-to-br from-indigo-900/40 to-black rounded-[2.5rem] border border-indigo-500/20 backdrop-blur-3xl relative overflow-hidden">
             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Referral Points</h4>
             <div className="flex items-end gap-2">
@@ -246,7 +247,6 @@ export default function Home() {
             </div>
           </section>
 
-          {/* FITUR DAILY CHECK-IN */}
           <section className="p-8 bg-zinc-900/60 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
             <div className="flex justify-between items-start mb-6">
               <div>
