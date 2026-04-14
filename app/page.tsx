@@ -67,7 +67,7 @@ export default function Home() {
 
       if (savedDate) setLastCheckIn(savedDate);
       if (savedStreak) setStreak(parseInt(savedStreak || "0"));
-      if (savedPoints) setRefPoints(parseInt(savedPoints));
+      if (savedPoints) setRefPoints(parseInt(savedPoints || "0"));
       if (savedDate === today) setCanCheckIn(false);
 
       if (publicKey) {
@@ -76,17 +76,12 @@ export default function Home() {
     }
   }, [mounted, publicKey]);
 
-  // --- FITUR: REQUEST AIRDROP (DENGAN ERROR HANDLING) ---
+  // --- FITUR: REQUEST AIRDROP ---
   const handleAirdrop = async () => {
     if (!publicKey) return alert("Connect wallet dulu, Gi!");
-    
     try {
       setLoadingAirdrop(true);
-      
-      // Request 1 SOL
       const signature = await connection.requestAirdrop(publicKey, 1 * LAMPORTS_PER_SOL);
-      
-      // Tunggu konfirmasi
       const latestBlockHash = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
         blockhash: latestBlockHash.blockhash,
@@ -95,29 +90,50 @@ export default function Home() {
       });
 
       addGlobalActivity("Claimed 1.0 SOL Faucet", "🚰");
-      alert("Airdrop Berhasil! 1 SOL masuk. 🚀");
-      getWalletData(); // Refresh saldo
+      alert("Airdrop Berhasil! 1 SOL telah masuk. 🚀");
+      getWalletData();
     } catch (error: any) {
-      console.error("Detail Eror:", error);
-      // Pesan yang lebih manusiawi untuk user jika faucet limit/down
-      alert("Maaf Gi, Faucet Solana Devnet lagi penuh/error. Coba lagi dalam 1 menit atau gunakan faucet eksternal.");
+      console.error(error);
+      alert("Maaf Gi, Faucet Solana Devnet lagi penuh. Coba lagi nanti ya!");
     } finally {
       setLoadingAirdrop(false);
     }
   };
 
-  // --- FITUR: FAME SHARING (TWITTER/X) ---
+  // --- FITUR: DAILY CHECK-IN (SESUAI REQUEST KAMU) ---
+  const handleDailyCheckIn = () => {
+    if (!connected) return alert("Connect wallet dulu, Gi!");
+    const today = new Date().toLocaleDateString();
+    if (lastCheckIn === today) return;
+
+    const newStreak = streak + 1;
+    const newPoints = refPoints + 5; // Tambah poin saat check-in
+    
+    setStreak(newStreak);
+    setRefPoints(newPoints);
+    setLastCheckIn(today);
+    setCanCheckIn(false);
+
+    localStorage.setItem('zegen_last_checkin', today);
+    localStorage.setItem('zegen_streak', newStreak.toString());
+    localStorage.setItem('zegen_ref_points', newPoints.toString());
+
+    addGlobalActivity(`Checked in (Day ${newStreak} Streak)`, "🔥");
+    alert(`Check-in Berhasil! +5 Points. Streak kamu: ${newStreak} hari 🔥`);
+  };
+
+  // --- FITUR: FAME SHARING ---
   const shareToTwitter = () => {
-    if (!publicKey) return alert("Connect wallet dulu untuk pamer pencapaian! 🚀");
-    const tweetText = `I'm grinding on Zegen Tech! 🚀\n\nCurrent Rank: ${rank}\nStreak: ${streak} Days 🔥\nPoints: ${refPoints} 💎\n\nJoin me on Solana Devnet and earn points here:\n${referralCode}`;
+    if (!publicKey) return alert("Connect wallet dulu! 🚀");
+    const tweetText = `I'm grinding on Zegen Tech! 🚀\nRank: ${rank}\nStreak: ${streak} Days 🔥\nPoints: ${refPoints} 💎\nJoin me: ${referralCode}`;
     const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
     window.open(twitterUrl, '_blank');
   };
 
   const copyReferral = () => {
-    if (!publicKey) return alert("Hubungkan wallet dulu, Gi!");
+    if (!publicKey) return alert("Hubungkan wallet dulu!");
     navigator.clipboard.writeText(referralCode);
-    alert("Referral link disalin! Bagikan untuk dapat poin 💎");
+    alert("Link disalin! Bagikan untuk dapat poin 💎");
   };
 
   const updateRank = (bal: number) => {
@@ -150,22 +166,6 @@ export default function Home() {
     }
   }, [connected, publicKey, getWalletData]);
 
-  const handleDailyCheckIn = () => {
-    const today = new Date().toLocaleDateString();
-    if (lastCheckIn === today) return;
-
-    const newStreak = streak + 1;
-    setStreak(newStreak);
-    setLastCheckIn(today);
-    setCanCheckIn(false);
-
-    localStorage.setItem('zegen_last_checkin', today);
-    localStorage.setItem('zegen_streak', newStreak.toString());
-
-    addGlobalActivity(`Checked in (Day ${newStreak} Streak)`, "🔥");
-    alert(`Check-in Berhasil! Streak kamu: ${newStreak} hari 🔥`);
-  };
-
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
@@ -185,7 +185,6 @@ export default function Home() {
         const newPoints = refPoints + 10;
         setRefPoints(newPoints);
         localStorage.setItem('zegen_ref_points', newPoints.toString());
-        addGlobalActivity("Earned 10 Points (Referral Bonus)", "💎");
       }
 
       addGlobalActivity(`Sent ${amount} SOL`, "💸");
@@ -223,77 +222,57 @@ export default function Home() {
         {/* KOLOM KIRI */}
         <div className="lg:col-span-4 space-y-6">
           
-          {/* BALANCE SECTION DENGAN TOMBOL AIRDROP */}
+          {/* BALANCE SECTION */}
           <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
             <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
-            
             <div className="flex justify-between items-start mb-4 relative z-10">
               <span className="text-[10px] text-zinc-500 font-black uppercase tracking-widest block">Current Balance</span>
-              <button 
-                onClick={handleAirdrop}
-                disabled={loadingAirdrop || !connected}
-                className="text-[9px] font-black bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white hover:text-black transition-all uppercase disabled:opacity-50"
-              >
+              <button onClick={handleAirdrop} disabled={loadingAirdrop || !connected} className="text-[9px] font-black bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white hover:text-black transition-all uppercase disabled:opacity-50">
                 {loadingAirdrop ? "Dripping..." : "🚰 Request Faucet"}
               </button>
             </div>
-
             <h2 className="text-5xl font-mono font-bold tracking-tighter relative z-10">
               {connected ? balance?.toFixed(3) : "0.000"} 
               <span className="text-lg text-indigo-400 italic ml-2">SOL</span>
             </h2>
-            
-            <div className="mt-6 flex justify-between items-center border-t border-white/5 pt-4 relative z-10">
-              <div>
-                <p className="text-[9px] text-zinc-600 uppercase font-black">Rank Status</p>
-                <span className="text-[11px] text-indigo-400 font-bold uppercase">{rank}</span>
-              </div>
-              <div className="text-right">
-                <p className="text-[9px] text-zinc-600 uppercase font-black">Network</p>
-                <span className="text-[11px] text-green-500 font-bold uppercase">Devnet</span>
-              </div>
-            </div>
           </section>
 
           {/* REFERRAL STATS */}
-          <section className="p-8 bg-gradient-to-br from-indigo-900/40 to-black rounded-[2.5rem] border border-indigo-500/20 backdrop-blur-3xl relative overflow-hidden group">
-            <div className="flex justify-between items-start mb-2 relative z-10">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400">Referral Program</h4>
-              <button onClick={shareToTwitter} className="bg-white/10 p-2 rounded-full hover:bg-white hover:text-black transition-all">
-                <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-              </button>
-            </div>
-            <div className="flex items-end gap-2 relative z-10">
+          <section className="p-8 bg-gradient-to-br from-indigo-900/40 to-black rounded-[2.5rem] border border-indigo-500/20 backdrop-blur-3xl relative overflow-hidden">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-400 mb-2">Referral Points</h4>
+            <div className="flex items-end gap-2">
               <h2 className="text-5xl font-mono font-bold">{refPoints}</h2>
               <span className="text-sm font-bold text-zinc-500 mb-2">POINTS</span>
             </div>
-            <div className="mt-6 p-4 bg-black/40 rounded-2xl border border-white/5 relative z-10">
-              <p className="text-[9px] text-zinc-400 uppercase font-black mb-2 tracking-widest">Your Unique Link</p>
-              <div className="flex justify-between items-center">
-                <span className="text-[10px] font-mono text-zinc-500 truncate mr-2">
-                  {publicKey ? `${referralCode.slice(0, 20)}...` : "Connect Wallet"}
-                </span>
-                <button onClick={copyReferral} className="text-[9px] font-black text-indigo-400 uppercase">Copy</button>
-              </div>
-            </div>
           </section>
 
-          {/* DAILY REWARDS & FAME SHARE */}
-          <section className="p-6 bg-indigo-600/10 rounded-[2rem] border border-indigo-500/20 group cursor-pointer hover:bg-indigo-600/20 transition-all" onClick={shareToTwitter}>
-             <div className="flex justify-between items-center">
-                <div>
-                  <h4 className="text-[10px] font-black uppercase text-indigo-400">Bragging Rights</h4>
-                  <p className="text-sm font-bold">Share your {streak} day streak! 🚀</p>
-                </div>
-                <span className="text-xs group-hover:translate-x-1 transition-transform">↗</span>
-             </div>
+          {/* FITUR DAILY CHECK-IN */}
+          <section className="p-8 bg-zinc-900/60 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-orange-500">Daily Rewards</h4>
+                <p className="text-sm font-bold mt-1">Day {streak} Streak 🔥</p>
+              </div>
+              <div className="bg-orange-500/20 text-orange-500 text-[10px] font-black px-3 py-1 rounded-full">+5 PTS / DAY</div>
+            </div>
+            <button 
+              onClick={handleDailyCheckIn}
+              disabled={!canCheckIn || !connected}
+              className={`w-full py-4 rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] transition-all active:scale-95 ${
+                canCheckIn && connected
+                  ? "bg-orange-500 text-white hover:bg-orange-600 shadow-lg shadow-orange-500/20"
+                  : "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+              }`}
+            >
+              {canCheckIn ? "Claim Daily Check-in" : "Already Claimed Today"}
+            </button>
+            {!connected && <p className="text-[9px] text-zinc-600 mt-3 text-center italic">Connect wallet to start your streak</p>}
           </section>
         </div>
 
         {/* KOLOM KANAN */}
         <div className="lg:col-span-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* TERMINAL */}
             <section className="p-8 bg-zinc-900 rounded-[2.5rem] border border-white/5 shadow-2xl">
               <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
                 <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span> Execution Terminal
@@ -307,28 +286,19 @@ export default function Home() {
               </form>
             </section>
 
-            {/* LEDGER ACTIVITY */}
             <section className="p-8 bg-zinc-900/20 rounded-[2.5rem] border border-white/5 overflow-hidden">
-              <h3 className="text-[10px] font-black uppercase tracking-widest mb-6 text-zinc-500 italic">Ledger Activity (Live)</h3>
+              <h3 className="text-[10px] font-black uppercase tracking-widest mb-6 text-zinc-500 italic">Ledger Activity</h3>
               <div className="space-y-4">
-                {history.length > 0 ? (
-                  history.map((tx, i) => (
-                    <div key={i} className="p-4 bg-black/40 rounded-2xl border border-white/5 group flex justify-between items-center">
-                      <div>
-                        <span className="text-[9px] font-mono text-indigo-400 font-bold block">{tx.signature.slice(0, 10)}...</span>
-                        <span className="text-[7px] text-zinc-600 uppercase font-bold">Confirmed</span>
-                      </div>
-                      <a href={`https://explorer.solana.com/tx/${tx.signature}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black bg-white/5 border border-white/10 px-3 py-1.5 rounded-lg hover:bg-white hover:text-black transition-all">View ↗</a>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-[10px] text-zinc-700 italic text-center py-4">No activity detected.</p>
-                )}
+                {history.map((tx, i) => (
+                  <div key={i} className="p-4 bg-black/40 rounded-2xl border border-white/5 flex justify-between items-center">
+                    <span className="text-[9px] font-mono text-indigo-400 font-bold">{tx.signature.slice(0, 10)}...</span>
+                    <a href={`https://explorer.solana.com/tx/${tx.signature}?cluster=devnet`} target="_blank" rel="noopener noreferrer" className="text-[9px] font-black bg-white/5 px-3 py-1.5 rounded-lg hover:bg-white hover:text-black transition-all">View ↗</a>
+                  </div>
+                ))}
               </div>
             </section>
           </div>
 
-          {/* NETWORK FEED */}
           <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl overflow-hidden">
             <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 italic mb-6">Network Live Feed</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -346,8 +316,8 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="mt-20 py-10 w-full text-center border-t border-white/5">
-        <p className="text-[9px] text-zinc-700 uppercase font-black tracking-[0.8em]">ZEGEN TECH &bull; ALL SYSTEMS OPERATIONAL &bull; 2026</p>
+      <footer className="mt-20 py-10 w-full text-center border-t border-white/5 text-[9px] text-zinc-700 uppercase font-black tracking-[0.8em]">
+        ZEGEN TECH &bull; ALL SYSTEMS OPERATIONAL &bull; 2026
       </footer>
     </main>
   );
