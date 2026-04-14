@@ -199,31 +199,29 @@ export default function Home() {
         <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full animate-mesh" style={{ animationDelay: '-5s' }}></div>
         <div className="absolute -bottom-[10%] left-[20%] w-[60%] h-[50%] bg-blue-600/5 rounded-full animate-mesh" style={{ animationDelay: '-10s' }}></div>
         
-        {/* Efek Garis Grid Halus & Noise */}
         <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
         <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
       </div>
 
-      {/* NAVBAR - z-index dinaikkan agar di atas mesh */}
-      <nav className="w-full max-w-6xl flex justify-between items-center py-6 mb-8 border-b border-white/5 relative z-10">
+      {/* NAVBAR FIXED */}
+      <nav className="w-full max-w-6xl flex justify-between items-center py-6 mb-8 border-b border-white/5 relative z-50">
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-black text-sm shadow-lg">ZEGEN</div>
           <button onClick={copyReferral} className="text-[10px] bg-indigo-600/20 border border-indigo-500/30 px-4 py-2 rounded-full font-bold text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all active:scale-95">
             🎁 EARN POINTS
           </button>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 relative">
           <button onClick={shareToTwitter} className="hidden md:block text-[10px] font-black text-zinc-400 hover:text-white transition-all">
             SHARE ACHIEVEMENT 𝕏
           </button>
-          <WalletMultiButton className="!rounded-2xl !bg-white !text-black shadow-xl font-bold" />
+          <div className="relative z-[9999]">
+            <WalletMultiButton className="!rounded-2xl !bg-white !text-black shadow-xl font-bold" />
+          </div>
         </div>
       </nav>
 
-      {/* CONTENT GRID - z-index dinaikkan */}
       <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
-        
-        {/* KOLOM KIRI */}
         <div className="lg:col-span-4 space-y-6">
           <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
             <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
@@ -269,7 +267,6 @@ export default function Home() {
           </section>
         </div>
 
-        {/* KOLOM KANAN */}
         <div className="lg:col-span-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <section className="p-8 bg-zinc-900/60 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl shadow-2xl">
