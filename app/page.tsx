@@ -156,14 +156,24 @@ export default function Home() {
     }
   }, [publicKey, connected, connection]);
 
-  // --- LOGIKA AUTO-RESET & AUTO-RECONNECT ---
+  // --- LOGIKA AUTO-RESET & AUTO-RECONNECT (UPDATED) ---
   useEffect(() => {
     if (connected && publicKey) {
+      // Saat wallet terhubung, tarik data terbaru
       getWalletData();
     } else { 
+      // 1. Reset State React agar UI langsung bersih
       setBalance(null); 
       setHistory([]); 
-      setRank("Guest"); 
+      setRank("Guest");
+      setRefPoints(0);  
+      setStreak(0);     
+      setCanCheckIn(true);
+
+      // 2. Reset LocalStorage agar data tidak "nyangkut" saat login lagi
+      localStorage.removeItem('zegen_ref_points');
+      localStorage.removeItem('zegen_streak');
+      localStorage.removeItem('zegen_last_checkin');
     }
   }, [connected, publicKey, getWalletData]);
 
@@ -223,7 +233,6 @@ export default function Home() {
         {/* KOLOM KIRI */}
         <div className="lg:col-span-4 space-y-6">
           
-          {/* BALANCE SECTION - UPDATED LOGIC */}
           <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
             <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
@@ -233,7 +242,6 @@ export default function Home() {
               </button>
             </div>
             <h2 className="text-5xl font-mono font-bold tracking-tighter relative z-10">
-              {/* Saldo akan muncul otomatis jika wallet connect dan data tersedia */}
               {connected && balance !== null ? balance.toFixed(3) : "0.000"} 
               <span className="text-lg text-indigo-400 italic ml-2">SOL</span>
             </h2>
