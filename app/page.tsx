@@ -50,31 +50,85 @@ export default function Home() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // --- LOGIKA REFERRAL & INITIAL LOAD ---
-  useEffect(() => {
-    if (mounted) {
-      const urlParams = new URLSearchParams(window.location.search);
-      const ref = urlParams.get('ref');
-      if (ref && ref !== publicKey?.toBase58()) {
-        setReferredBy(ref);
-        localStorage.setItem('zegen_referred_by', ref);
-      }
+  const updateRank = (bal: number) => {
+    if (bal === 0) setRank("Beginner");
+    else if (bal > 0 && bal <= 1) setRank("Solana Scout");
+    else if (bal > 1 && bal <= 5) setRank("Web3 Warrior");
+    else if (bal > 5) setRank("Solana Whale 🐳");
+  };
 
-      const savedDate = localStorage.getItem('zegen_last_checkin');
-      const savedStreak = localStorage.getItem('zegen_streak');
-      const savedPoints = localStorage.getItem('zegen_ref_points');
-      const today = new Date().toLocaleDateString();
-
-      if (savedDate) setLastCheckIn(savedDate);
-      if (savedStreak) setStreak(parseInt(savedStreak || "0"));
-      if (savedPoints) setRefPoints(parseInt(savedPoints || "0"));
-      if (savedDate === today) setCanCheckIn(false);
-
-      if (publicKey) {
-        setReferralCode(`${window.location.origin}?ref=${publicKey.toBase58()}`);
+  // --- FUNGSI AMBIL DATA WALLET (SALDO & HISTORY) ---
+  const getWalletData = useCallback(async () => {
+    if (connected && publicKey) {
+      try {
+        const bal = await connection.getBalance(publicKey);
+        const solBalance = bal / LAMPORTS_PER_SOL;
+        setBalance(solBalance);
+        updateRank(solBalance);
+        const signatures = await connection.getSignaturesForAddress(publicKey, { limit: 5 });
+        setHistory(signatures);
+      } catch (e: any) { 
+        console.error("Gagal ambil data blockchain:", e);
+        setBalance(0); 
       }
     }
-  }, [mounted, publicKey]);
+  }, [publicKey, connected, connection]);
+
+  // --- LOGIKA LOAD DATA BERDASARKAN WALLET ADDRESS (PERSISTENCE) ---
+  useEffect(() => {
+    if (mounted && connected && publicKey) {
+      const walletAddr = publicKey.toBase58();
+      
+      // 1. Ambil data spesifik wallet ini dari localStorage
+      const savedDate = localStorage.getItem(`zegen_date_${walletAddr}`);
+      const savedStreak = localStorage.getItem(`zegen_streak_${walletAddr}`);
+      const savedPoints = localStorage.getItem(`zegen_points_${walletAddr}`);
+      const today = new Date().toLocaleDateString();
+
+      // 2. Update State berdasarkan memori
+      setLastCheckIn(savedDate || null);
+      setStreak(parseInt(savedStreak || "0"));
+      setRefPoints(parseInt(savedPoints || "0"));
+      setCanCheckIn(savedDate !== today);
+      setReferralCode(`${window.location.origin}?ref=${walletAddr}`);
+      
+      // 3. Tarik saldo asli dari Solana Devnet
+      getWalletData();
+
+    } else if (mounted && !connected) {
+      // Reset UI secara visual saat disconnect tanpa menghapus localStorage
+      setBalance(null);
+      setHistory([]);
+      setRank("Guest");
+      setRefPoints(0);
+      setStreak(0);
+      setCanCheckIn(true);
+    }
+  }, [mounted, connected, publicKey, getWalletData]);
+
+  // --- FITUR: DAILY CHECK-IN ---
+  const handleDailyCheckIn = () => {
+    if (!connected || !publicKey) return alert("Connect wallet dulu, Gi!");
+    const today = new Date().toLocaleDateString();
+    if (lastCheckIn === today) return;
+
+    const walletAddr = publicKey.toBase58();
+    const newStreak = streak + 1;
+    const newPoints = refPoints + 5; 
+    
+    setStreak(newStreak);
+    setRefPoints(newPoints);
+    setLastCheckIn(today);
+    setCanCheckIn(false);
+
+    // Simpan permanen dengan prefix alamat wallet agar tidak tertukar
+    localStorage.setItem(`zegen_date_${walletAddr}`, today);
+    localStorage.setItem(`zegen_streak_${walletAddr}`, newStreak.toString());
+    localStorage.setItem(`zegen_points_${walletAddr}`, newPoints.toString());
+
+    addGlobalActivity(`Checked in (Day ${newStreak} Streak)`, "🔥");
+    alert(`Check-in Berhasil! +5 Points. Streak kamu: ${newStreak} hari 🔥`);
+  };
 
   // --- FITUR: REQUEST AIRDROP ---
   const handleAirdrop = async () => {
@@ -90,93 +144,16 @@ export default function Home() {
       });
 
       addGlobalActivity("Claimed 1.0 SOL Faucet", "🚰");
-      alert("Airdrop Berhasil! 1 SOL telah masuk. 🚀");
-      getWalletData();
+      alert("Airdrop Berhasil! Saldo akan terupdate otomatis.");
+      getWalletData(); 
     } catch (error: any) {
-      console.error(error);
-      alert("Maaf Gi, Faucet Solana Devnet lagi penuh. Coba lagi nanti ya!");
+      alert("Maaf Gi, Faucet Solana Devnet lagi sibuk!");
     } finally {
       setLoadingAirdrop(false);
     }
   };
 
-  // --- FITUR: DAILY CHECK-IN ---
-  const handleDailyCheckIn = () => {
-    if (!connected) return alert("Connect wallet dulu, Gi!");
-    const today = new Date().toLocaleDateString();
-    if (lastCheckIn === today) return;
-
-    const newStreak = streak + 1;
-    const newPoints = refPoints + 5; 
-    
-    setStreak(newStreak);
-    setRefPoints(newPoints);
-    setLastCheckIn(today);
-    setCanCheckIn(false);
-
-    localStorage.setItem('zegen_last_checkin', today);
-    localStorage.setItem('zegen_streak', newStreak.toString());
-    localStorage.setItem('zegen_ref_points', newPoints.toString());
-
-    addGlobalActivity(`Checked in (Day ${newStreak} Streak)`, "🔥");
-    alert(`Check-in Berhasil! +5 Points. Streak kamu: ${newStreak} hari 🔥`);
-  };
-
-  // --- FITUR: FAME SHARING ---
-  const shareToTwitter = () => {
-    if (!publicKey) return alert("Connect wallet dulu! 🚀");
-    const tweetText = `I'm grinding on Zegen Tech! 🚀\nRank: ${rank}\nStreak: ${streak} Days 🔥\nPoints: ${refPoints} 💎\nJoin me: ${referralCode}`;
-    const twitterUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`;
-    window.open(twitterUrl, '_blank');
-  };
-
-  const copyReferral = () => {
-    if (!publicKey) return alert("Hubungkan wallet dulu!");
-    navigator.clipboard.writeText(referralCode);
-    alert("Link disalin! Bagikan untuk dapat poin 💎");
-  };
-
-  const updateRank = (bal: number) => {
-    if (bal === 0) setRank("Beginner");
-    else if (bal > 0 && bal <= 1) setRank("Solana Scout");
-    else if (bal > 1 && bal <= 5) setRank("Web3 Warrior");
-    else if (bal > 5) setRank("Solana Whale 🐳");
-  };
-
-  const getWalletData = useCallback(async () => {
-    if (connected && publicKey) {
-      try {
-        const bal = await connection.getBalance(publicKey);
-        const solBalance = bal / LAMPORTS_PER_SOL;
-        setBalance(solBalance);
-        updateRank(solBalance);
-        const signatures = await connection.getSignaturesForAddress(publicKey, { limit: 5 });
-        setHistory(signatures);
-      } catch (e: any) { console.error("Gagal ambil data:", e); }
-    }
-  }, [publicKey, connected, connection]);
-
-  // --- LOGIKA AUTO-RESET & AUTO-RECONNECT (UPDATED) ---
-  useEffect(() => {
-    if (connected && publicKey) {
-      // Saat wallet terhubung, tarik data terbaru
-      getWalletData();
-    } else { 
-      // 1. Reset State React agar UI langsung bersih
-      setBalance(null); 
-      setHistory([]); 
-      setRank("Guest");
-      setRefPoints(0);  
-      setStreak(0);     
-      setCanCheckIn(true);
-
-      // 2. Reset LocalStorage agar data tidak "nyangkut" saat login lagi
-      localStorage.removeItem('zegen_ref_points');
-      localStorage.removeItem('zegen_streak');
-      localStorage.removeItem('zegen_last_checkin');
-    }
-  }, [connected, publicKey, getWalletData]);
-
+  // --- FITUR: TRANSFER ---
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
@@ -192,11 +169,10 @@ export default function Home() {
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, "confirmed");
       
-      if (referredBy) {
-        const newPoints = refPoints + 10;
-        setRefPoints(newPoints);
-        localStorage.setItem('zegen_ref_points', newPoints.toString());
-      }
+      const walletAddr = publicKey.toBase58();
+      const newPoints = refPoints + 10;
+      setRefPoints(newPoints);
+      localStorage.setItem(`zegen_points_${walletAddr}`, newPoints.toString());
 
       addGlobalActivity(`Sent ${amount} SOL`, "💸");
       setReceiver(""); setAmount("");
@@ -205,6 +181,18 @@ export default function Home() {
     } catch (error: any) {
       alert("Error: " + error.message);
     } finally { setTxLoading(false); }
+  };
+
+  const shareToTwitter = () => {
+    if (!publicKey) return alert("Connect wallet dulu!");
+    const tweetText = `I'm grinding on Zegen Tech! 🚀\nRank: ${rank}\nStreak: ${streak} Days 🔥\nPoints: ${refPoints} 💎\nJoin me: ${referralCode}`;
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(tweetText)}`, '_blank');
+  };
+
+  const copyReferral = () => {
+    if (!publicKey) return alert("Hubungkan wallet dulu!");
+    navigator.clipboard.writeText(referralCode);
+    alert("Link disalin!");
   };
 
   if (!mounted) return null;
@@ -232,7 +220,6 @@ export default function Home() {
         
         {/* KOLOM KIRI */}
         <div className="lg:col-span-4 space-y-6">
-          
           <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl relative overflow-hidden group">
             <div className="absolute -right-10 -bottom-10 w-32 h-32 bg-indigo-500/5 rounded-full blur-3xl group-hover:bg-indigo-500/10 transition-all"></div>
             <div className="flex justify-between items-start mb-4 relative z-10">
