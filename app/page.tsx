@@ -74,37 +74,52 @@ export default function Home() {
     }
   }, [publicKey, connected, connection]);
 
-  // --- LOGIKA LOAD DATA BERDASARKAN WALLET ADDRESS (PERSISTENCE) ---
+  // --- LOGIKA LOAD DATA BERDASARKAN WALLET ADDRESS (SINKRONISASI PAKSA) ---
   useEffect(() => {
-    if (mounted && connected && publicKey) {
-      const walletAddr = publicKey.toBase58();
-      
-      // 1. Ambil data spesifik wallet ini dari localStorage
-      const savedDate = localStorage.getItem(`zegen_date_${walletAddr}`);
-      const savedStreak = localStorage.getItem(`zegen_streak_${walletAddr}`);
-      const savedPoints = localStorage.getItem(`zegen_points_${walletAddr}`);
-      const today = new Date().toLocaleDateString();
+    const loadData = async () => {
+      if (mounted && connected && publicKey) {
+        const walletAddr = publicKey.toBase58();
+        
+        // 1. Ambil data spesifik wallet ini dari localStorage (Streak & Points)
+        const savedDate = localStorage.getItem(`zegen_date_${walletAddr}`);
+        const savedStreak = localStorage.getItem(`zegen_streak_${walletAddr}`);
+        const savedPoints = localStorage.getItem(`zegen_points_${walletAddr}`);
+        const today = new Date().toLocaleDateString();
 
-      // 2. Update State berdasarkan memori
-      setLastCheckIn(savedDate || null);
-      setStreak(parseInt(savedStreak || "0"));
-      setRefPoints(parseInt(savedPoints || "0"));
-      setCanCheckIn(savedDate !== today);
-      setReferralCode(`${window.location.origin}?ref=${walletAddr}`);
-      
-      // 3. Tarik saldo asli dari Solana Devnet
-      getWalletData();
+        setLastCheckIn(savedDate || null);
+        setStreak(parseInt(savedStreak || "0"));
+        setRefPoints(parseInt(savedPoints || "0"));
+        setCanCheckIn(savedDate !== today);
+        
+        setReferralCode(`${window.location.origin}?ref=${walletAddr}`);
+        
+        // 2. PAKSA SINKRONISASI SALDO (Ini perbaikannya, Gi)
+        try {
+          const bal = await connection.getBalance(publicKey);
+          const solBalance = bal / LAMPORTS_PER_SOL;
+          setBalance(solBalance);
+          updateRank(solBalance);
+          
+          // Ambil riwayat transaksi terbaru
+          const signatures = await connection.getSignaturesForAddress(publicKey, { limit: 5 });
+          setHistory(signatures);
+        } catch (err) {
+          console.error("Gagal sinkron saldo:", err);
+        }
 
-    } else if (mounted && !connected) {
-      // Reset UI secara visual saat disconnect tanpa menghapus localStorage
-      setBalance(null);
-      setHistory([]);
-      setRank("Guest");
-      setRefPoints(0);
-      setStreak(0);
-      setCanCheckIn(true);
-    }
-  }, [mounted, connected, publicKey, getWalletData]);
+      } else if (mounted && !connected) {
+        // Reset UI saat disconnect
+        setBalance(null);
+        setHistory([]);
+        setRank("Guest");
+        setRefPoints(0);
+        setStreak(0);
+        setCanCheckIn(true);
+      }
+    };
+
+    loadData();
+  }, [mounted, connected, publicKey, connection, getWalletData]);
 
   // --- FITUR: DAILY CHECK-IN ---
   const handleDailyCheckIn = () => {
@@ -121,7 +136,6 @@ export default function Home() {
     setLastCheckIn(today);
     setCanCheckIn(false);
 
-    // Simpan permanen dengan prefix alamat wallet agar tidak tertukar
     localStorage.setItem(`zegen_date_${walletAddr}`, today);
     localStorage.setItem(`zegen_streak_${walletAddr}`, newStreak.toString());
     localStorage.setItem(`zegen_points_${walletAddr}`, newPoints.toString());
