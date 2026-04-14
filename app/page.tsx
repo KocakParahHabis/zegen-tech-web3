@@ -57,7 +57,6 @@ export default function Home() {
     else if (bal > 5) setRank("Solana Whale 🐳");
   };
 
-  // --- FUNGSI AMBIL DATA WALLET (SALDO & HISTORY) ---
   const getWalletData = useCallback(async () => {
     if (connected && publicKey) {
       try {
@@ -74,13 +73,10 @@ export default function Home() {
     }
   }, [publicKey, connected, connection]);
 
-  // --- LOGIKA LOAD DATA BERDASARKAN WALLET ADDRESS (SINKRONISASI PAKSA) ---
   useEffect(() => {
     const loadData = async () => {
       if (mounted && connected && publicKey) {
         const walletAddr = publicKey.toBase58();
-        
-        // 1. Ambil data spesifik wallet ini dari localStorage (Streak & Points)
         const savedDate = localStorage.getItem(`zegen_date_${walletAddr}`);
         const savedStreak = localStorage.getItem(`zegen_streak_${walletAddr}`);
         const savedPoints = localStorage.getItem(`zegen_points_${walletAddr}`);
@@ -90,25 +86,19 @@ export default function Home() {
         setStreak(parseInt(savedStreak || "0"));
         setRefPoints(parseInt(savedPoints || "0"));
         setCanCheckIn(savedDate !== today);
-        
         setReferralCode(`${window.location.origin}?ref=${walletAddr}`);
         
-        // 2. PAKSA SINKRONISASI SALDO (Ini perbaikannya, Gi)
         try {
           const bal = await connection.getBalance(publicKey);
           const solBalance = bal / LAMPORTS_PER_SOL;
           setBalance(solBalance);
           updateRank(solBalance);
-          
-          // Ambil riwayat transaksi terbaru
           const signatures = await connection.getSignaturesForAddress(publicKey, { limit: 5 });
           setHistory(signatures);
         } catch (err) {
           console.error("Gagal sinkron saldo:", err);
         }
-
       } else if (mounted && !connected) {
-        // Reset UI saat disconnect
         setBalance(null);
         setHistory([]);
         setRank("Guest");
@@ -117,34 +107,27 @@ export default function Home() {
         setCanCheckIn(true);
       }
     };
-
     loadData();
   }, [mounted, connected, publicKey, connection, getWalletData]);
 
-  // --- FITUR: DAILY CHECK-IN ---
   const handleDailyCheckIn = () => {
     if (!connected || !publicKey) return alert("Connect wallet dulu, Gi!");
     const today = new Date().toLocaleDateString();
     if (lastCheckIn === today) return;
-
     const walletAddr = publicKey.toBase58();
     const newStreak = streak + 1;
     const newPoints = refPoints + 5; 
-    
     setStreak(newStreak);
     setRefPoints(newPoints);
     setLastCheckIn(today);
     setCanCheckIn(false);
-
     localStorage.setItem(`zegen_date_${walletAddr}`, today);
     localStorage.setItem(`zegen_streak_${walletAddr}`, newStreak.toString());
     localStorage.setItem(`zegen_points_${walletAddr}`, newPoints.toString());
-
     addGlobalActivity(`Checked in (Day ${newStreak} Streak)`, "🔥");
     alert(`Check-in Berhasil! +5 Points. Streak kamu: ${newStreak} hari 🔥`);
   };
 
-  // --- FITUR: REQUEST AIRDROP ---
   const handleAirdrop = async () => {
     if (!publicKey) return alert("Connect wallet dulu, Gi!");
     try {
@@ -156,9 +139,8 @@ export default function Home() {
         lastValidBlockHeight: latestBlockHash.lastValidBlockHeight,
         signature: signature,
       });
-
       addGlobalActivity("Claimed 1.0 SOL Faucet", "🚰");
-      alert("Airdrop Berhasil! Saldo akan terupdate otomatis.");
+      alert("Airdrop Berhasil!");
       getWalletData(); 
     } catch (error: any) {
       alert("Maaf Gi, Faucet Solana Devnet lagi sibuk!");
@@ -167,7 +149,6 @@ export default function Home() {
     }
   };
 
-  // --- FITUR: TRANSFER ---
   const handleTransfer = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!connected || !publicKey) return;
@@ -182,12 +163,10 @@ export default function Home() {
       );
       const signature = await sendTransaction(transaction, connection);
       await connection.confirmTransaction(signature, "confirmed");
-      
       const walletAddr = publicKey.toBase58();
       const newPoints = refPoints + 10;
       setRefPoints(newPoints);
       localStorage.setItem(`zegen_points_${walletAddr}`, newPoints.toString());
-
       addGlobalActivity(`Sent ${amount} SOL`, "💸");
       setReceiver(""); setAmount("");
       getWalletData();
@@ -212,10 +191,21 @@ export default function Home() {
   if (!mounted) return null;
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-6 bg-[#050505] text-white font-sans selection:bg-indigo-500/30 relative overflow-x-hidden">
+    <main className="flex min-h-screen flex-col items-center p-6 bg-[#020202] text-white font-sans selection:bg-indigo-500/30 relative overflow-hidden">
       
-      {/* NAVBAR */}
-      <nav className="w-full max-w-6xl flex justify-between items-center py-6 mb-8 border-b border-white/5">
+      {/* BACKGROUND ESTETIK (LIVING MESH) */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-[10%] -left-[10%] w-[50%] h-[50%] bg-indigo-600/10 rounded-full animate-mesh"></div>
+        <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full animate-mesh" style={{ animationDelay: '-5s' }}></div>
+        <div className="absolute -bottom-[10%] left-[20%] w-[60%] h-[50%] bg-blue-600/5 rounded-full animate-mesh" style={{ animationDelay: '-10s' }}></div>
+        
+        {/* Efek Garis Grid Halus & Noise */}
+        <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20 brightness-100 contrast-150"></div>
+        <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.05) 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
+      </div>
+
+      {/* NAVBAR - z-index dinaikkan agar di atas mesh */}
+      <nav className="w-full max-w-6xl flex justify-between items-center py-6 mb-8 border-b border-white/5 relative z-10">
         <div className="flex items-center gap-3">
           <div className="px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 rounded-xl font-black text-sm shadow-lg">ZEGEN</div>
           <button onClick={copyReferral} className="text-[10px] bg-indigo-600/20 border border-indigo-500/30 px-4 py-2 rounded-full font-bold text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all active:scale-95">
@@ -230,7 +220,8 @@ export default function Home() {
         </div>
       </nav>
 
-      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* CONTENT GRID - z-index dinaikkan */}
+      <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
         
         {/* KOLOM KIRI */}
         <div className="lg:col-span-4 space-y-6">
@@ -275,27 +266,26 @@ export default function Home() {
             >
               {canCheckIn ? "Claim Daily Check-in" : "Already Claimed Today"}
             </button>
-            {!connected && <p className="text-[9px] text-zinc-600 mt-3 text-center italic">Connect wallet to start your streak</p>}
           </section>
         </div>
 
         {/* KOLOM KANAN */}
         <div className="lg:col-span-8 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <section className="p-8 bg-zinc-900 rounded-[2.5rem] border border-white/5 shadow-2xl">
-              <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-8 flex items-center gap-2">
+            <section className="p-8 bg-zinc-900/60 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl shadow-2xl">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] mb-8 flex items-center gap-2 text-zinc-400">
                 <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span> Execution Terminal
               </h3>
               <form onSubmit={handleTransfer} className="space-y-5">
-                <input type="text" placeholder="Receiver Address" className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-mono focus:border-indigo-500 outline-none transition-all" value={receiver} onChange={(e) => setReceiver(e.target.value)} required />
-                <input type="text" placeholder="0.00 SOL" className="w-full bg-black border border-zinc-800 p-4 rounded-2xl text-xs font-mono focus:border-indigo-500 outline-none transition-all" value={amount} onChange={(e) => setAmount(e.target.value)} required />
-                <button disabled={txLoading} className="w-full py-4 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:bg-indigo-600 hover:text-white transition-all active:scale-95">
+                <input type="text" placeholder="Receiver Address" className="w-full bg-black/50 border border-zinc-800 p-4 rounded-2xl text-xs font-mono focus:border-indigo-500 outline-none transition-all" value={receiver} onChange={(e) => setReceiver(e.target.value)} required />
+                <input type="text" placeholder="0.00 SOL" className="w-full bg-black/50 border border-zinc-800 p-4 rounded-2xl text-xs font-mono focus:border-indigo-500 outline-none transition-all" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                <button disabled={txLoading} className="w-full py-4 bg-white text-black rounded-2xl font-black text-[11px] uppercase tracking-[0.2em] hover:bg-indigo-600 hover:text-white transition-all active:scale-95 shadow-xl">
                   {txLoading ? "Verifying..." : "Execute & Earn"}
                 </button>
               </form>
             </section>
 
-            <section className="p-8 bg-zinc-900/20 rounded-[2.5rem] border border-white/5 overflow-hidden">
+            <section className="p-8 bg-zinc-900/40 rounded-[2.5rem] border border-white/5 backdrop-blur-3xl overflow-hidden">
               <h3 className="text-[10px] font-black uppercase tracking-widest mb-6 text-zinc-500 italic">Ledger Activity</h3>
               <div className="space-y-4">
                 {history.map((tx, i) => (
@@ -312,7 +302,7 @@ export default function Home() {
             <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-400 italic mb-6">Network Live Feed</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {globalActivities.map((act, i) => (
-                <div key={i} className="flex items-center gap-4 p-4 bg-black/40 rounded-2xl border border-white/5">
+                <div key={i} className="flex items-center gap-4 p-4 bg-black/40 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all">
                   <div className="w-10 h-10 rounded-full bg-zinc-900 flex items-center justify-center text-lg">{act.icon}</div>
                   <div className="flex-1">
                     <p className="text-[10px] font-black text-white">{act.user}</p>
@@ -325,7 +315,7 @@ export default function Home() {
         </div>
       </div>
 
-      <footer className="mt-20 py-10 w-full text-center border-t border-white/5 text-[9px] text-zinc-700 uppercase font-black tracking-[0.8em]">
+      <footer className="mt-20 py-10 w-full text-center border-t border-white/5 text-[9px] text-zinc-700 uppercase font-black tracking-[0.8em] relative z-10">
         ZEGEN TECH &bull; ALL SYSTEMS OPERATIONAL &bull; 2026
       </footer>
     </main>
